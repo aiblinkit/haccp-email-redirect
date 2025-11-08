@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conferma Email - HACCP Manager</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .container {
+      background: white;
+      border-radius: 20px;
+      padding: 40px;
+      max-width: 500px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      text-align: center;
+    }
+    .icon {
+      font-size: 64px;
+      margin-bottom: 20px;
+      animation: bounce 2s infinite;
+    }
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    h1 {
+      color: #2c3e50;
+      margin-bottom: 10px;
+      font-size: 24px;
+    }
+    p {
+      color: #7f8c8d;
+      line-height: 1.6;
+      margin-bottom: 30px;
+    }
+    .button {
+      display: inline-block;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 15px 40px;
+      border-radius: 50px;
+      text-decoration: none;
+      font-weight: 600;
+      transition: transform 0.2s;
+      margin: 10px;
+    }
+    .button:hover {
+      transform: scale(1.05);
+    }
+    .button:active {
+      transform: scale(0.95);
+    }
+    .info {
+      margin-top: 30px;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 10px;
+      font-size: 14px;
+      color: #6c757d;
+    }
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #667eea;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-right: 10px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .success {
+      color: #27ae60;
+      font-weight: 600;
+    }
+    .error {
+      color: #e74c3c;
+      margin-top: 20px;
+      padding: 15px;
+      background: #fee;
+      border-radius: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">✅</div>
+    <h1>Email Confermata!</h1>
+    <p id="message">
+      <span class="loading"></span>
+      Apertura di HACCP Manager...
+    </p>
+    <a href="#" class="button" id="openApp">Apri HACCP Manager</a>
+    <div class="info">
+      <strong>L'app non si apre?</strong><br>
+      1. Assicurati di avere HACCP Manager installata<br>
+      2. Prova a cliccare sul pulsante sopra<br>
+      3. Se ancora non funziona, apri l'app manualmente
+    </div>
+    <div id="errorMessage" class="error" style="display:none;"></div>
+  </div>
+  <script>
+    // Estrae i parametri dall'URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token') || urlParams.get('token_hash');
+    const type = urlParams.get('type') || 'signup';
+    const access_token = urlParams.get('access_token');
+    const refresh_token = urlParams.get('refresh_token');
+
+    console.log('📧 Parametri ricevuti:', { token, type, access_token, refresh_token });
+
+    if (!token && !access_token) {
+      document.getElementById('message').innerHTML = 
+        '<span class="error">❌</span> Link non valido o scaduto';
+      document.getElementById('errorMessage').style.display = 'block';
+      document.getElementById('errorMessage').textContent = 
+        'Il link di conferma non è valido o è scaduto. Richiedi una nuova email di conferma.';
+    } else {
+      // Costruisci l'URL per aprire l'app
+      let appUrl = `haccpmanager://auth/confirm?type=${type}`;
+      if (token) appUrl += `&token=${token}`;
+      if (access_token) appUrl += `&access_token=${access_token}`;
+      if (refresh_token) appUrl += `&refresh_token=${refresh_token}`;
+
+      console.log('🔗 URL app generato:', appUrl);
+
+      // Imposta il link del pulsante
+      document.getElementById('openApp').href = appUrl;
+
+      // Tenta di aprire l'app automaticamente dopo 1 secondo
+      setTimeout(() => {
+        console.log('🚀 Tentativo apertura automatica app...');
+        window.location.href = appUrl;
+        
+        // Dopo 3 secondi, mostra messaggio di successo
+        setTimeout(() => {
+          document.getElementById('message').innerHTML = 
+            '<span class="success">✓</span> Se l\'app non si è aperta, clicca sul pulsante sopra.';
+        }, 3000);
+      }, 1000);
+
+      // Gestione click manuale
+      document.getElementById('openApp').addEventListener('click', (e) => {
+        e.preventDefault();
+        console.log('🖱️ Click manuale sul pulsante');
+        window.location.href = appUrl;
+        document.getElementById('message').innerHTML = 
+          '<span class="success">✓</span> Apertura in corso...';
+      });
+    }
+  </script>
+</body>
+</html>
+
