@@ -97,247 +97,75 @@
       background: #fee;
       border-radius: 10px;
     }
-    .debug {
-      margin-top: 20px;
-      padding: 15px;
-      background: #f0f8ff;
-      border-radius: 10px;
-      font-family: monospace;
-      font-size: 12px;
-      text-align: left;
-      color: #333;
-    }
-    .confirmation-status {
-      margin: 20px 0;
-      padding: 15px;
-      border-radius: 10px;
-      font-weight: bold;
-    }
-    .status-pending {
-      background: #fff3cd;
-      color: #856404;
-      border: 1px solid #ffeaa7;
-    }
-    .status-success {
-      background: #d4edda;
-      color: #155724;
-      border: 1px solid #c3e6cb;
-    }
-    .status-error {
-      background: #f8d7da;
-      color: #721c24;
-      border: 1px solid #f5c6cb;
-    }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="icon" id="mainIcon">⏳</div>
-    <h1 id="mainTitle">Conferma Email</h1>
-    <div id="confirmationStatus" class="confirmation-status status-pending">
-      <span class="loading"></span>
-      Verifica email in corso...
-    </div>
+    <div class="icon">✅</div>
+    <h1>Email Confermata!</h1>
     <p id="message">
-      Attendere mentre confermiamo il tuo account...
+      <span class="loading"></span>
+      Apertura di HACCP Manager...
     </p>
-    <a href="#" class="button" id="openApp" style="display:none;">Apri HACCP Manager</a>
-    <div class="info" id="infoBox">
-      <strong>Conferma Automatica</strong><br>
-      La tua email viene confermata automaticamente.<br>
-      Non è necessario aprire l'app mobile.
+    <a href="#" class="button" id="openApp">Apri HACCP Manager</a>
+    <div class="info">
+      <strong>L'app non si apre?</strong><br>
+      1. Assicurati di avere HACCP Manager installata<br>
+      2. Prova a cliccare sul pulsante sopra<br>
+      3. Se ancora non funziona, apri l'app manualmente
     </div>
     <div id="errorMessage" class="error" style="display:none;"></div>
-    <div id="debugInfo" class="debug" style="display:none;"></div>
   </div>
-
-  <!-- Supabase JS Library -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  
   <script>
-    // Configurazione Supabase
-    const SUPABASE_URL = 'https://byuniiqwjdqbyzlkswzq.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ5dW5paXF3amRxYnl6bGtzd3pxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAyNjY3MzYsImV4cCI6MjA3NTg0MjczNn0.TbLNAi_AE6Hu8yZE5CO-L9Xvy6uNvUyiun2PRaAgr4c';
+    // Estrae i parametri dall'URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token') || urlParams.get('token_hash');
+    const type = urlParams.get('type') || 'signup';
+    const access_token = urlParams.get('access_token');
+    const refresh_token = urlParams.get('refresh_token');
 
-    // Inizializza Supabase Client
-    const { createClient } = supabase;
-    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    console.log('📧 Parametri ricevuti:', { token, type, access_token, refresh_token });
 
-    // Funzioni di utilità
-    function showDebug(info) {
-      const debugDiv = document.getElementById('debugInfo');
-      debugDiv.style.display = 'block';
-      debugDiv.innerHTML = '<strong>Debug Info:</strong><br>' + 
-        Object.entries(info).map(([key, value]) => `${key}: ${value}`).join('<br>');
-    }
-
-    function updateStatus(type, message, icon = '') {
-      const statusDiv = document.getElementById('confirmationStatus');
-      const mainIcon = document.getElementById('mainIcon');
-      const mainTitle = document.getElementById('mainTitle');
-      
-      statusDiv.className = `confirmation-status status-${type}`;
-      statusDiv.innerHTML = message;
-      
-      if (icon) {
-        mainIcon.textContent = icon;
-      }
-      
-      if (type === 'success') {
-        mainTitle.textContent = 'Email Confermata!';
-        document.getElementById('message').innerHTML = 'Il tuo account è stato attivato con successo.';
-      } else if (type === 'error') {
-        mainTitle.textContent = 'Errore Conferma';
-      }
-    }
-
-    // Conferma email usando Supabase JS
-    async function confirmEmailWithSupabase(token, type) {
-      console.log('🔐 Tentativo conferma via Supabase JS...');
-      
-      try {
-        updateStatus('pending', '⏳ Verifica token in corso...', '⏳');
-
-        // ✅ METODO CORRETTO: Usa verifyOtp di Supabase JS
-        const { data, error } = await supabaseClient.auth.verifyOtp({
-          token_hash: token,
-          type: type || 'signup'
-        });
-
-        console.log('📊 Risposta Supabase verifyOtp:', { data, error });
-
-        if (error) {
-          throw new Error(error.message);
-        }
-
-        if (data.user) {
-          console.log('✅ Email confermata con successo!');
-          console.log('👤 Utente:', data.user.email);
-          console.log('📧 Email confermata il:', data.user.email_confirmed_at);
-          
-          updateStatus('success', '✅ Email confermata con successo!', '✅');
-          
-          // Mostra pulsante per aprire app (se su mobile)
-          if (isMobile()) {
-            showAppButton(token, type);
-          } else {
-            document.getElementById('infoBox').innerHTML = `
-              <strong>✅ Completato!</strong><br>
-              Email confermata con successo.<br>
-              Ora puoi accedere alla tua app HACCP Manager.
-            `;
-          }
-          
-          return true;
-        } else {
-          throw new Error('Nessun utente ritornato dopo la verifica');
-        }
-
-      } catch (error) {
-        console.error('❌ Errore conferma Supabase:', error);
-        throw error;
-      }
-    }
-
-    // Rileva se è un dispositivo mobile
-    function isMobile() {
-      return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    }
-
-    // Mostra pulsante per aprire app mobile
-    function showAppButton(token, type) {
-      const appButton = document.getElementById('openApp');
-      const appUrl = `haccpmanager://auth/confirm?type=${type}&token=${token}`;
-      
-      appButton.href = appUrl;
-      appButton.style.display = 'inline-block';
-      
-      document.getElementById('infoBox').innerHTML = `
-        <strong>✅ Completato!</strong><br>
-        Email confermata. Se hai l'app mobile installata,<br>
-        puoi aprirla cliccando il pulsante sopra.
-      `;
-
-      appButton.addEventListener('click', (e) => {
-        e.preventDefault();
-        console.log('📱 Apertura app mobile...');
-        window.location.href = appUrl;
-      });
-    }
-
-    // Processo principale
-    async function processEmailConfirmation() {
-      console.log('🚀 Inizio processo conferma email...');
-      
-      const urlParams = new URLSearchParams(window.location.search);
-      const token = urlParams.get('token') || urlParams.get('token_hash');
-      const type = urlParams.get('type') || 'signup';
-      const access_token = urlParams.get('access_token');
-      const refresh_token = urlParams.get('refresh_token');
-
-      // Debug info
-      showDebug({
-        'Token presente': !!token,
-        'Token Hash presente': !!urlParams.get('token_hash'),
-        'Access Token presente': !!access_token,
-        'Refresh Token presente': !!refresh_token,
-        'Type': type,
-        'User Agent': navigator.userAgent.includes('Mobile') ? 'Mobile' : 'Desktop',
-        'Timestamp': new Date().toLocaleString(),
-        'URL completo': window.location.href
-      });
-
-      // GESTIONE DIVERSI FORMATI
-      if (access_token && refresh_token) {
-        console.log('📝 Formato nuovo: access_token + refresh_token');
-        try {
-          updateStatus('pending', '⏳ Impostazione sessione...', '⏳');
-          
-          const { data, error } = await supabaseClient.auth.setSession({
-            access_token,
-            refresh_token
-          });
-
-          if (error) throw new Error(error.message);
-          
-          updateStatus('success', '✅ Sessione impostata con successo!', '✅');
-          console.log('✅ Sessione impostata:', data.user?.email);
-          return;
-          
-        } catch (error) {
-          console.error('❌ Errore impostazione sessione:', error);
-          updateStatus('error', `❌ Errore sessione: ${error.message}`, '❌');
-          return;
-        }
-      }
-      
-      if (token) {
-        console.log('📝 Formato legacy: token singolo');
-        try {
-          await confirmEmailWithSupabase(token, type);
-          return;
-        } catch (error) {
-          console.error('❌ Errore conferma token:', error);
-          updateStatus('error', `❌ Errore: ${error.message}`, '❌');
-          document.getElementById('errorMessage').style.display = 'block';
-          document.getElementById('errorMessage').textContent = 
-            `Errore durante la conferma: ${error.message}`;
-          return;
-        }
-      }
-
-      // Nessun parametro valido trovato
-      updateStatus('error', '❌ Token mancante o non valido', '❌');
+    if (!token && !access_token) {
+      document.getElementById('message').innerHTML = 
+        '<span class="error">❌</span> Link non valido o scaduto';
       document.getElementById('errorMessage').style.display = 'block';
       document.getElementById('errorMessage').textContent = 
         'Il link di conferma non è valido o è scaduto. Richiedi una nuova email di conferma.';
-    }
+    } else {
+      // Costruisci l'URL per aprire l'app
+      let appUrl = `haccpmanager://auth/confirm?type=${type}`;
+      if (token) appUrl += `&token=${token}`;
+      if (access_token) appUrl += `&access_token=${access_token}`;
+      if (refresh_token) appUrl += `&refresh_token=${refresh_token}`;
 
-    // Avvia il processo quando la pagina è caricata
-    document.addEventListener('DOMContentLoaded', () => {
-      console.log('📄 Pagina caricata, avvio processo...');
-      processEmailConfirmation();
-    });
+      console.log('🔗 URL app generato:', appUrl);
+
+      // Imposta il link del pulsante
+      document.getElementById('openApp').href = appUrl;
+
+      // Tenta di aprire l'app automaticamente dopo 1 secondo
+      setTimeout(() => {
+        console.log('🚀 Tentativo apertura automatica app...');
+        window.location.href = appUrl;
+        
+        // Dopo 3 secondi, mostra messaggio di successo
+        setTimeout(() => {
+          document.getElementById('message').innerHTML = 
+            '<span class="success">✓</span> Se l\'app non si è aperta, clicca sul pulsante sopra.';
+        }, 3000);
+      }, 1000);
+
+      // Gestione click manuale
+      document.getElementById('openApp').addEventListener('click', (e) => {
+        e.preventDefault();
+        console.log('🖱️ Click manuale sul pulsante');
+        window.location.href = appUrl;
+        document.getElementById('message').innerHTML = 
+          '<span class="success">✓</span> Apertura in corso...';
+      });
+    }
   </script>
 </body>
 </html>
+
