@@ -97,6 +97,16 @@
       background: #fee;
       border-radius: 10px;
     }
+    .debug {
+      margin-top: 20px;
+      padding: 15px;
+      background: #f0f8ff;
+      border-radius: 10px;
+      font-family: monospace;
+      font-size: 12px;
+      text-align: left;
+      color: #333;
+    }
   </style>
 </head>
 <body>
@@ -115,8 +125,17 @@
       3. Se ancora non funziona, apri l'app manualmente
     </div>
     <div id="errorMessage" class="error" style="display:none;"></div>
+    <div id="debugInfo" class="debug" style="display:none;"></div>
   </div>
   <script>
+    // Debug: mostra informazioni per troubleshooting
+    function showDebug(info) {
+      const debugDiv = document.getElementById('debugInfo');
+      debugDiv.style.display = 'block';
+      debugDiv.innerHTML = '<strong>Debug Info:</strong><br>' + 
+        Object.entries(info).map(([key, value]) => `${key}: ${value}`).join('<br>');
+    }
+
     // Estrae i parametri dall'URL
     const urlParams = new URLSearchParams(window.location.search);
     const token = urlParams.get('token') || urlParams.get('token_hash');
@@ -124,7 +143,16 @@
     const access_token = urlParams.get('access_token');
     const refresh_token = urlParams.get('refresh_token');
 
-    console.log('📧 Parametri ricevuti:', { token, type, access_token, refresh_token });
+    console.log('📧 Parametri ricevuti:', { token: !!token, type, access_token: !!access_token, refresh_token: !!refresh_token });
+
+    // Debug info
+    showDebug({
+      'Token presente': !!token,
+      'Access Token presente': !!access_token,
+      'Refresh Token presente': !!refresh_token,
+      'Type': type,
+      'Formato': access_token ? 'NUOVO (con session)' : 'LEGACY (solo token)'
+    });
 
     if (!token && !access_token) {
       document.getElementById('message').innerHTML = 
@@ -133,39 +161,60 @@
       document.getElementById('errorMessage').textContent = 
         'Il link di conferma non è valido o è scaduto. Richiedi una nuova email di conferma.';
     } else {
-      // Costruisci l'URL per aprire l'app
+      // Costruisci l'URL per aprire l'app - GESTISCE ENTRAMBI I FORMATI
       let appUrl = `haccpmanager://auth/confirm?type=${type}`;
-      if (token) appUrl += `&token=${token}`;
-      if (access_token) appUrl += `&access_token=${access_token}`;
-      if (refresh_token) appUrl += `&refresh_token=${refresh_token}`;
+      
+      // NUOVO FORMATO (preferito)
+      if (access_token && refresh_token) {
+        appUrl += `&access_token=${access_token}&refresh_token=${refresh_token}`;
+        console.log('🔗 Usando formato NUOVO (session tokens)');
+      } 
+      // FORMATO LEGACY (fallback)
+      else if (token) {
+        appUrl += `&token=${token}`;
+        console.log('🔗 Usando formato LEGACY (token singolo)');
+      }
 
       console.log('🔗 URL app generato:', appUrl);
 
       // Imposta il link del pulsante
       document.getElementById('openApp').href = appUrl;
 
-      // Tenta di aprire l'app automaticamente dopo 1 secondo
+      // Tenta di aprire l'app automaticamente dopo 2 secondi (più tempo per leggere)
       setTimeout(() => {
         console.log('🚀 Tentativo apertura automatica app...');
-        window.location.href = appUrl;
+        try {
+          window.location.href = appUrl;
+        } catch (error) {
+          console.error('❌ Errore apertura app:', error);
+          document.getElementById('errorMessage').style.display = 'block';
+          document.getElementById('errorMessage').textContent = 
+            'Errore apertura app automatica. Prova il pulsante manuale.';
+        }
         
-        // Dopo 3 secondi, mostra messaggio di successo
+        // Dopo 4 secondi, mostra messaggio di fallback
         setTimeout(() => {
           document.getElementById('message').innerHTML = 
             '<span class="success">✓</span> Se l\'app non si è aperta, clicca sul pulsante sopra.';
-        }, 3000);
-      }, 1000);
+        }, 4000);
+      }, 2000);
 
       // Gestione click manuale
       document.getElementById('openApp').addEventListener('click', (e) => {
         e.preventDefault();
         console.log('🖱️ Click manuale sul pulsante');
-        window.location.href = appUrl;
-        document.getElementById('message').innerHTML = 
-          '<span class="success">✓</span> Apertura in corso...';
+        try {
+          window.location.href = appUrl;
+          document.getElementById('message').innerHTML = 
+            '<span class="success">✓</span> Apertura in corso...';
+        } catch (error) {
+          console.error('❌ Errore click manuale:', error);
+          document.getElementById('errorMessage').style.display = 'block';
+          document.getElementById('errorMessage').textContent = 
+            'Errore apertura app. Assicurati che HACCP Manager sia installata.';
+        }
       });
     }
   </script>
 </body>
 </html>
-
