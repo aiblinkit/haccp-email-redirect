@@ -151,10 +151,17 @@
     <div id="debugInfo" class="debug" style="display:none;"></div>
   </div>
 
+  <!-- Supabase JS Library -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
   <script>
     // Configurazione Supabase
     const SUPABASE_URL = 'https://byuniiqwjdqbyzlkswzq.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ5dW5paXF3amRxYnl6bGtzd3pxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAyNjY3MzYsImV4cCI6MjA3NTg0MjczNn0.TbLNAi_AE6Hu8yZE5CO-L9Xvy6uNvUyiun2PRaAgr4c';
+
+    // Inizializza Supabase Client
+    const { createClient } = supabase;
+    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // Funzioni di utilità
     function showDebug(info) {
@@ -184,44 +191,50 @@
       }
     }
 
-    // Conferma email direttamente via API Supabase
-    async function confirmEmailDirectly(token, type) {
-      console.log('🔐 Tentativo conferma diretta via Supabase API...');
+    // Conferma email usando Supabase JS
+    async function confirmEmailWithSupabase(token, type) {
+      console.log('🔐 Tentativo conferma via Supabase JS...');
       
       try {
-        // Chiamata diretta all'API Supabase per verificare il token
-        const response = await fetch(`${SUPABASE_URL}/auth/v1/verify`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
-          },
-          body: JSON.stringify({
-            token: token,
-            type: type || 'signup'
-          })
+        updateStatus('pending', '⏳ Verifica token in corso...', '⏳');
+
+        // ✅ METODO CORRETTO: Usa verifyOtp di Supabase JS
+        const { data, error } = await supabaseClient.auth.verifyOtp({
+          token_hash: token,
+          type: type || 'signup'
         });
 
-        const result = await response.json();
-        console.log('📊 Risposta Supabase:', result);
+        console.log('📊 Risposta Supabase verifyOtp:', { data, error });
 
-        if (response.ok && result.user) {
-          console.log('✅ Email confermata con successo via API!');
+        if (error) {
+          throw new Error(error.message);
+        }
+
+        if (data.user) {
+          console.log('✅ Email confermata con successo!');
+          console.log('👤 Utente:', data.user.email);
+          console.log('📧 Email confermata il:', data.user.email_confirmed_at);
+          
           updateStatus('success', '✅ Email confermata con successo!', '✅');
           
           // Mostra pulsante per aprire app (se su mobile)
           if (isMobile()) {
             showAppButton(token, type);
+          } else {
+            document.getElementById('infoBox').innerHTML = `
+              <strong>✅ Completato!</strong><br>
+              Email confermata con successo.<br>
+              Ora puoi accedere alla tua app HACCP Manager.
+            `;
           }
           
           return true;
         } else {
-          throw new Error(result.error?.message || `HTTP ${response.status}: ${response.statusText}`);
+          throw new Error('Nessun utente ritornato dopo la verifica');
         }
 
       } catch (error) {
-        console.error('❌ Errore conferma diretta:', error);
+        console.error('❌ Errore conferma Supabase:', error);
         throw error;
       }
     }
@@ -240,59 +253,91 @@
       appButton.style.display = 'inline-block';
       
       document.getElementById('infoBox').innerHTML = `
-        <strong>Completato!</strong><br>
+        <strong>✅ Completato!</strong><br>
         Email confermata. Se hai l'app mobile installata,<br>
         puoi aprirla cliccando il pulsante sopra.
       `;
 
       appButton.addEventListener('click', (e) => {
         e.preventDefault();
+        console.log('📱 Apertura app mobile...');
         window.location.href = appUrl;
       });
     }
 
     // Processo principale
     async function processEmailConfirmation() {
+      console.log('🚀 Inizio processo conferma email...');
+      
       const urlParams = new URLSearchParams(window.location.search);
       const token = urlParams.get('token') || urlParams.get('token_hash');
       const type = urlParams.get('type') || 'signup';
+      const access_token = urlParams.get('access_token');
+      const refresh_token = urlParams.get('refresh_token');
 
       // Debug info
       showDebug({
         'Token presente': !!token,
+        'Token Hash presente': !!urlParams.get('token_hash'),
+        'Access Token presente': !!access_token,
+        'Refresh Token presente': !!refresh_token,
         'Type': type,
         'User Agent': navigator.userAgent.includes('Mobile') ? 'Mobile' : 'Desktop',
-        'Timestamp': new Date().toLocaleString()
+        'Timestamp': new Date().toLocaleString(),
+        'URL completo': window.location.href
       });
 
-      if (!token) {
-        updateStatus('error', '❌ Token mancante o non valido', '❌');
-        document.getElementById('errorMessage').style.display = 'block';
-        document.getElementById('errorMessage').textContent = 
-          'Il link di conferma non è valido o è scaduto. Richiedi una nuova email di conferma.';
-        return;
+      // GESTIONE DIVERSI FORMATI
+      if (access_token && refresh_token) {
+        console.log('📝 Formato nuovo: access_token + refresh_token');
+        try {
+          updateStatus('pending', '⏳ Impostazione sessione...', '⏳');
+          
+          const { data, error } = await supabaseClient.auth.setSession({
+            access_token,
+            refresh_token
+          });
+
+          if (error) throw new Error(error.message);
+          
+          updateStatus('success', '✅ Sessione impostata con successo!', '✅');
+          console.log('✅ Sessione impostata:', data.user?.email);
+          return;
+          
+        } catch (error) {
+          console.error('❌ Errore impostazione sessione:', error);
+          updateStatus('error', `❌ Errore sessione: ${error.message}`, '❌');
+          return;
+        }
+      }
+      
+      if (token) {
+        console.log('📝 Formato legacy: token singolo');
+        try {
+          await confirmEmailWithSupabase(token, type);
+          return;
+        } catch (error) {
+          console.error('❌ Errore conferma token:', error);
+          updateStatus('error', `❌ Errore: ${error.message}`, '❌');
+          document.getElementById('errorMessage').style.display = 'block';
+          document.getElementById('errorMessage').textContent = 
+            `Errore durante la conferma: ${error.message}`;
+          return;
+        }
       }
 
-      try {
-        // 🚀 CONFERMA DIRETTA VIA API
-        updateStatus('pending', '⏳ Conferma in corso...', '⏳');
-        
-        await confirmEmailDirectly(token, type);
-        
-        console.log('🎉 Processo di conferma completato con successo!');
-        
-      } catch (error) {
-        console.error('❌ Errore nel processo di conferma:', error);
-        updateStatus('error', `❌ Errore: ${error.message}`, '❌');
-        
-        document.getElementById('errorMessage').style.display = 'block';
-        document.getElementById('errorMessage').textContent = 
-          `Errore durante la conferma: ${error.message}`;
-      }
+      // Nessun parametro valido trovato
+      updateStatus('error', '❌ Token mancante o non valido', '❌');
+      document.getElementById('errorMessage').style.display = 'block';
+      document.getElementById('errorMessage').textContent = 
+        'Il link di conferma non è valido o è scaduto. Richiedi una nuova email di conferma.';
     }
 
     // Avvia il processo quando la pagina è caricata
-    document.addEventListener('DOMContentLoaded', processEmailConfirmation);
+    document.addEventListener('DOMContentLoaded', () => {
+      console.log('📄 Pagina caricata, avvio processo...');
+      processEmailConfirmation();
+    });
   </script>
 </body>
 </html>
